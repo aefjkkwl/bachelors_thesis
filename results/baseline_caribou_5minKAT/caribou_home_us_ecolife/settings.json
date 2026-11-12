@@ -1,0 +1,35 @@
+{
+  "ecolife_dir": "<ECOLIFE_REPO>",
+  "trace_dir": null,
+  "placements": "results/caribou_replay_home_us/placements.csv",
+  "fixed_region": null,
+  "ci": [
+    "eu-central-1=data/carbon/snapshots_2026-02-10_DE-2025-hourly.csv",
+    "us-east-1=data/carbon/snapshots_2026-02-10_US-MIDA-PJM-2025-hourly.csv"
+  ],
+  "column": "Carbon intensity gCO₂eq/kWh (direct)",
+  "start": "2025-08-25T00:00:00",
+  "days": 7,
+  "start_minute": 20,
+  "kat": [
+    "0",
+    "5",
+    "10",
+    "15",
+    "20",
+    "25",
+    "30"
+  ],
+  "hardware": [
+    "old",
+    "new"
+  ],
+  "server_pair": [
+    "i3",
+    "m5zn"
+  ],
+  "pool_rule": "ecolife",
+  "out": "results/baseline_caribou_5minKAT/caribou_home_us_ecolife",
+  "trace_functions": 1000,
+  "unit": "gCO2eq (EcoLife formulas)"
+}

@@ -1,0 +1,5 @@
+from,to,n,mean_ms,median_ms,p95_ms
+aws:eu-central-1,aws:eu-central-1,100,1.68,1.64,2.25
+aws:eu-central-1,aws:us-east-1,100,90.19,90.1,91.88
+aws:us-east-1,aws:eu-central-1,100,92.89,92.86,93.68
+aws:us-east-1,aws:us-east-1,100,1.63,1.64,2.25

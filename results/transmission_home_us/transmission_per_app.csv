@@ -1,0 +1,11 @@
+app,workflow,mb_per_call,invocations,shifted,shifted_share,gb_total,gb_shifted,baseline_best_g,baseline_worst_g,caribou_best_g,caribou_worst_g
+bfs-1000k,sebs_graph_bfs,0.0209,216796,94058,0.4339,4.42,1.92,1.32,0.0,1.22,2.28
+compression,sebs_compression,19.0119,513432,282404,0.55,9532.54,5243.2,2842.15,0.0,2603.78,6420.11
+dna,sebs_dna_visualisation,167.259,15432,8418,0.5455,2520.65,1374.99,768.85,0.0,701.52,1711.45
+dynamic-100k,sebs_dynamic_html,0.0129,1996714,925658,0.4636,25.15,11.66,7.49,0.0,6.86,13.75
+image-recog,sebs_image_recognition,0.0801,204485,94664,0.4629,16.0,7.4,4.75,0.0,4.36,8.71
+mst-1000k,sebs_graph_mst,0.0202,157203,72704,0.4625,3.1,1.43,0.92,0.0,0.85,1.69
+pagerank-1000k,sebs_graph_pagerank,0.0243,370589,170807,0.4609,8.79,4.05,2.62,0.0,2.4,4.77
+thumbnailer,sebs_thumbnailer,0.7941,1750284,951430,0.5436,1357.32,737.82,404.28,0.0,370.97,903.72
+upload-img,sebs_uploader,0.5419,599360,320714,0.5351,317.18,169.72,94.26,0.0,86.03,205.14
+video,sebs_video_processing,15.365,180891,102659,0.5675,2714.25,1540.39,808.39,0.0,740.5,1897.66
