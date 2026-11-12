@@ -1,0 +1,93 @@
+diff --git a/main.py b/main.py
+index d0268e9..1746429 100644
+--- a/main.py
++++ b/main.py
+@@ -6,9 +6,9 @@ from optimizers import  perf_opt,carbon_opt,oracle,tech
+ import sys
+ 
+ def main(
+-    region: str="US-CAL",
+-    start_hour: int=800,
+-    interval: int=12*24*60,
++    region: str="DE",
++    start_hour: int=5664,
++    interval: int=7*24*60,
+     mem_old: int = 512,
+     mem_new: int = 512,
+     app_list: list = None,
+@@ -24,9 +24,11 @@ def main(
+         app_list = df.iloc[:, 0].tolist()
+     # load carbon intensity data
+     carbon_intensity, ci_max, ci_min,ci_avg = utils.load_carbon_intensity(region, start_hour, interval)
++    sim_interval = interval - window_size
+ 
+     #load trace:
+     traces, trace_function_names,_ = utils.read_selected_traces()
++    traces = [t[:len(carbon_intensity)] for t in traces]
+     for trace in traces:
+         assert len(trace) == len(carbon_intensity)
+     function_mem_trace = [utils.read_func_mem_size(trace_function_names[i]) for i in range(len(traces))]
+@@ -48,7 +50,7 @@ def main(
+         optimizer = oracle.oracle(traces,trace_function_names,server_pair,carbon_intensity,ci_avg,STlambda, window_size,interval) 
+         optimizer.optimize() 
+     elif optimizer == "eco-life":
+-        optimizer = tech.tech(traces,trace_function_names,server_pair,kat_time,STlambda,carbon_intensity,window_size,mem_old,mem_new,ci_max,function_mem_trace,pso_size,region,interval)
++        optimizer = tech.tech(traces,trace_function_names,server_pair,kat_time,STlambda,carbon_intensity,window_size,mem_old,mem_new,ci_max,function_mem_trace,pso_size,region,sim_interval)
+         optimizer.optimize()
+     else: 
+         sys.exit("input optimizer is not correct!")
+diff --git a/utils.py b/utils.py
+index dba298c..521ae28 100644
+--- a/utils.py
++++ b/utils.py
+@@ -168,18 +168,24 @@ def get_st(app, server):
+     return data['cs'] + data['exe'], data['exe']
+ 
+ 
++CI_COLUMN = "Carbon intensity gCO₂eq/kWh (direct)"   # column of the Electricity Maps export
++TOTAL_MINUTES = 7*24*60                                # 7 days = 10,080 minutes
++
+ def load_carbon_intensity(
+-    region: str="US-CAL",
+-    start_hour: int=800,
+-    interval: int=12*24*60,
++    region: str="DE",
++    start_hour: int=5664,
++    interval: int=TOTAL_MINUTES,
+ ):
+-    region_data = glob(f"{Path(__file__).parents[0]}/carbon_intensity/{region}*_2023_hourly.csv")[0]
+-
++    region_data = glob(f"{Path(__file__).parents[0]}/carbon_intensity/{region}*_2025_hourly.csv")[0]
+     df = pd.read_csv(region_data)
+-    data = df["Carbon Intensity gCO₂eq/kWh (direct)"].values[start_hour:start_hour+int(12*24*60/60)]
+-    ci_avg = df["Carbon Intensity gCO₂eq/kWh (direct)"].mean()
+-    ci_max = df["Carbon Intensity gCO₂eq/kWh (direct)"].max()
+-    ci_min = df["Carbon Intensity gCO₂eq/kWh (direct)"].min()
++    n_hours = interval // 60
++    data = df[CI_COLUMN].values[start_hour:start_hour+n_hours]
++    assert len(data) == n_hours, f"only {len(data)} hours found, expected {n_hours}"
++    print("Carbon period:", df["Datetime (UTC)"].iloc[start_hour], "to",
++          df["Datetime (UTC)"].iloc[start_hour+n_hours-1])
++    ci_avg = df[CI_COLUMN].mean()
++    ci_max = df[CI_COLUMN].max()
++    ci_min = df[CI_COLUMN].min()
+     data_list = data.tolist()
+     ci = []
+     for item in data_list:
+@@ -217,14 +223,14 @@ def read_selected_traces():
+     function_names = []
+     path_list = []
+     original_function_names = []
+-    for file in os.listdir(directory_path):
++    for file in sorted(os.listdir(directory_path)):
+         if file.endswith('.txt'):
+             original_function_names.append(file.split('.txt')[0])
+             function_names.append(file.split('*')[0])
+             path_list.append( os.path.join(directory_path, file))
+     for file in path_list:
+         with open(file, 'r') as f:
+-            file_content = [line.strip() for line in f.readlines()]
++            file_content = [line.strip() for line in f.readlines()][:TOTAL_MINUTES]
+             traces.append(file_content)
+     return traces,function_names,original_function_names
+ def prob_cold(cur_interval, kat):
