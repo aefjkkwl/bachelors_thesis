@@ -78,5 +78,5 @@ variant (thesis, Section 7.4.1).
 - Energy profiles and embodied carbon of the hardware: EcoLife (`data/avg_data/`,
   `server_info.json` in the EcoLife repository).
 
-Raw EcoLife outputs (`carbon_*.json`, `st_*.json`, about 145 MB) are not included and are
-available on request.
+   Raw EcoLife outputs (`carbon_*.json.gz`, `st_*.json.gz`) are in `results/ecolife/raw/`.
+   `evaluation/reconstruct_ecolife.py --results-dir results/ecolife/raw` reproduces the breakdown in `results/ecolife/`.
