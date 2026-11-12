@@ -6,5 +6,6 @@ __pycache__/
 htmlcov/
 desktop.ini
 .env
+payloads_final/ 
 *.zip
 sim_day_state.json
