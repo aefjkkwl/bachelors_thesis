@@ -1,0 +1,287 @@
+diff --git a/caribou/common/models/remote_client/aws_remote_client.py b/caribou/common/models/remote_client/aws_remote_client.py
+--- a/caribou/common/models/remote_client/aws_remote_client.py
++++ b/caribou/common/models/remote_client/aws_remote_client.py
+@@ -294,7 +294,9 @@ class AWSRemoteClient(RemoteClient):  # pylint: disable=too-many-public-methods
+             "Role": role_identifier,
+             "Environment": {"Variables": environment_variables},
+             "MemorySize": memory_size,
++            "Architectures": ["arm64"],
+         }
++
+         if timeout >= 1:
+             kwargs["Timeout"] = timeout
+         arn, state = self._create_lambda_function(kwargs)
+@@ -444,9 +446,9 @@ class AWSRemoteClient(RemoteClient):  # pylint: disable=too-many-public-methods
+         # For AWS lambda insights for CPU and IO logging
+         # https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Lambda-Insights-Getting-Started-docker.html
+         lambda_insight_command = (
+-            """RUN curl -O https://lambda-insights-extension.s3-ap-northeast-1.amazonaws.com/amazon_linux/lambda-insights-extension.rpm && """  # pylint: disable=line-too-long
+-            """rpm -U lambda-insights-extension.rpm && """
+-            """rm -f lambda-insights-extension.rpm"""
++            """RUN curl -O https://lambda-insights-extension-arm64.s3-ap-northeast-1.amazonaws.com/amazon_linux/lambda-insights-extension-arm64.rpm && """
++            """rpm -U lambda-insights-extension-arm64.rpm && """
++            """rm -f lambda-insights-extension-arm64.rpm"""
+         )
+
+         return f"""
+@@ -465,7 +467,7 @@ class AWSRemoteClient(RemoteClient):  # pylint: disable=too-many-public-methods
+
+     def _build_docker_image(self, context_path: str, image_name: str) -> None:
+         try:
+-            subprocess.run(["docker", "build", "--platform", "linux/amd64", "-t", image_name, context_path], check=True)
++            subprocess.run(["docker", "build", "--platform", "linux/arm64", "-t", image_name, context_path], check=True)
+             logger.info("Docker image %s built successfully.", image_name)
+         except subprocess.CalledProcessError as e:
+             # This will catch errors from the subprocess and logger.info a message.
+diff --git a/caribou/data_collector/components/carbon/carbon_retriever.py b/caribou/data_collector/components/carbon/carbon_retriever.py
+--- a/caribou/data_collector/components/carbon/carbon_retriever.py
++++ b/caribou/data_collector/components/carbon/carbon_retriever.py
+@@ -2,7 +2,8 @@ import asyncio
+ import math
+ import os
+ import time
+-from datetime import datetime, timedelta, timezone
++import json
++from datetime import datetime, timedelta, timezone, date
+ from functools import partial
+ from os import mkdir
+ from pathlib import Path
+@@ -19,6 +20,17 @@ from caribou.data_collector.components.data_retriever import DataRetriever
+ from caribou.data_collector.utils.constants import EC_MAPS_HISTORICAL_BASE_URL
+ from caribou.data_collector.utils.ec_maps_zone_finder.index import find_zone as finder
+
++_CUSTOM_DATA_DIR = Path(__file__).parent.parent / "custom_carbon_data"
++_SIM_STATE_FILE = _CUSTOM_DATA_DIR / "sim_day_state.json"
++
++_SIM_WEEK_START = date(2025, 8, 25)  # Monday of ISO week 35 -- first simulated day
++_SIM_WEEK_LENGTH_DAYS = 7
++
++CUSTOM_REGION_CSV_MAP = {
++    "eu-central-1": str(_CUSTOM_DATA_DIR / "snapshots_2026-02-10_DE-2025-hourly.csv"),
++    "us-east-1": str(_CUSTOM_DATA_DIR / "snapshots_2026-02-10_US-MIDA-PJM-2025-hourly.csv"),
++}
++
+
+ class CarbonRetriever(DataRetriever):  # pylint: disable=too-many-instance-attributes
+     def __init__(self, client: RemoteClient) -> None:
+@@ -27,14 +39,11 @@ class CarbonRetriever(DataRetriever):  # pylint: disable=too-many-instance-attri
+
+         self._electricity_maps_auth_token = os.environ.get("ELECTRICITY_MAPS_AUTH_TOKEN")
+
+-        if self._electricity_maps_auth_token is None and not self._integration_test_on:
+-            raise ValueError("ELECTRICITY_MAPS_AUTH_TOKEN environment variable not set")
+-
++
+         self._request_backoff = 0.1
+         self._last_request = datetime.now(GLOBAL_TIME_ZONE)
+         self._global_average_worst_case_carbon_intensity = 475.0
+
+-        # Must be in UTC And enforced in the format "YYYY-MM-DDTHH:MM:SSZ"
+         self._start_timestamp = (
+             (datetime.now(GLOBAL_TIME_ZONE) - timedelta(days=6, hours=23))
+             .replace(minute=0, second=0, microsecond=0)
+@@ -46,7 +55,6 @@ class CarbonRetriever(DataRetriever):  # pylint: disable=too-many-instance-attri
+         )
+
+         self._carbon_intensity_history_cache: dict[tuple[float, float], Optional[dict[str, Any]]] = {}
+-
+         self._carbon_intensity_cache: dict[tuple[float, float], float] = {}
+
+         self._finder_data_path = Path("/tmp/ec_maps_zone_finder")
+@@ -54,33 +62,45 @@ class CarbonRetriever(DataRetriever):  # pylint: disable=too-many-instance-attri
+
+     def retrieve_carbon_region_data(self) -> dict[str, dict[str, Any]]:
+         result_dict: dict[str, dict[str, Any]] = {}
+-        for region_key, available_region in self._available_regions.items():
+-            # We have 2 methods to retrieve the carbon intensity
+-            # One is overall average carbon intensity
+-            # Another one is hourly average carbon intensity
+-
+-            ## Overall average carbon intensity
+-            overall_average_data = self._get_execution_carbon_intensity(
+-                available_region, self._get_overall_average_carbon_intensity
+-            )
+
+-            if overall_average_data is None:
+-                continue
++        day_index = self._get_sim_day_index()
++        target_date = _SIM_WEEK_START + timedelta(days=day_index)
++        window_start = datetime.combine(target_date - timedelta(days=7), datetime.min.time(), tzinfo=GLOBAL_TIME_ZONE)
++        window_end = datetime.combine(target_date, datetime.min.time(), tzinfo=GLOBAL_TIME_ZONE)
+
+-            ## Hourly average carbon intensity
+-            # For this we need a 24 hour loop
+-            hourly_average_data: dict[str, dict[str, Any]] = {}
+-            for hour in range(24):
+-                carbon_intensity = self._get_execution_carbon_intensity(
+-                    available_region, partial(self._get_hour_average_carbon_intensity, hour=hour)
+-                )
++        used_custom_data = False
+
+-                if carbon_intensity is not None:
+-                    hourly_average_data[str(hour)] = carbon_intensity
++        for region_key, available_region in self._available_regions.items():
++            region_code = available_region.get("code")
+
+-            averages = {"overall": overall_average_data, **hourly_average_data}
++            if region_code in CUSTOM_REGION_CSV_MAP:
++                used_custom_data = True
++                raw_history = self._load_custom_raw_history_window(
++                    CUSTOM_REGION_CSV_MAP[region_code], window_start, window_end
++                )
++                processed = self._process_raw_carbon_intensity_history(raw_history)
++                averages = {
++                    "overall": {"carbon_intensity": processed["overall_average"]},
++                    **{str(h): {"carbon_intensity": v} for h, v in processed["hourly_average"].items()},
++                }
++            else:
++                if self._electricity_maps_auth_token is None:
++                    continue  # without a token: skip regions outside the simulation
++                overall_average_data = self._get_execution_carbon_intensity(
++                    available_region, self._get_overall_average_carbon_intensity
++                )
++
++                if overall_average_data is None:
++                    continue
++                hourly_average_data: dict[str, dict[str, Any]] = {}
++                for hour in range(24):
++                    carbon_intensity = self._get_execution_carbon_intensity(
++                        available_region, partial(self._get_hour_average_carbon_intensity, hour=hour)
++                    )
++                    if carbon_intensity is not None:
++                        hourly_average_data[str(hour)] = carbon_intensity
++                averages = {"overall": overall_average_data, **hourly_average_data}
+
+-            # Store the result
+             result_dict[region_key] = {
+                 "averages": averages,
+                 "units": "gCO2eq/kWh",
+@@ -88,8 +108,43 @@ class CarbonRetriever(DataRetriever):  # pylint: disable=too-many-instance-attri
+                 "transmission_distances_unit": "km",
+             }
+
++        if used_custom_data:
++            print(f"[SIM] Simulated day: {target_date.isoformat()} (index {day_index}/6, window: {window_start} to {window_end})")
++            self._advance_sim_day_index()
++
+         return result_dict
+
++    def _get_sim_day_index(self) -> int:
++        if _SIM_STATE_FILE.exists():
++            with open(_SIM_STATE_FILE, "r", encoding="utf-8") as f:
++                state = json.load(f)
++            return state.get("day_index", 0) % _SIM_WEEK_LENGTH_DAYS
++        return 0
++
++    def _advance_sim_day_index(self) -> None:
++        current = self._get_sim_day_index()
++        next_index = (current + 1) % _SIM_WEEK_LENGTH_DAYS
++        with open(_SIM_STATE_FILE, "w", encoding="utf-8") as f:
++            json.dump({"day_index": next_index}, f)
++
++    def _load_custom_raw_history_window(
++        self, csv_path: str, window_start: datetime, window_end: datetime
++    ) -> list[dict[str, str]]:
++        df = pd.read_csv(csv_path)
++        col = "Carbon intensity gCO₂eq/kWh (direct)"
++        df["dt"] = pd.to_datetime(df["Datetime (UTC)"])
++        if df["dt"].dt.tz is None:
++            df["dt"] = df["dt"].dt.tz_localize("UTC")
++
++        mask = (df["dt"] >= window_start) & (df["dt"] < window_end)
++        filtered = df.loc[mask].sort_values("dt")
++
++        records = []
++        for _, row in filtered.iterrows():
++            dt_str = row["dt"].isoformat().replace("+00:00", "Z")
++            records.append({"datetime": dt_str, "carbonIntensity": str(row[col])})
++        return records
++
+     def _get_execution_carbon_intensity(
+         self, available_region: dict[str, Any], get_carbon_intensity_from_coordinates: Callable
+     ) -> Optional[dict[str, Any]]:
+diff --git a/caribou/data_collector/components/provider/provider_retriever.py b/caribou/data_collector/components/provider/provider_retriever.py
+--- a/caribou/data_collector/components/provider/provider_retriever.py
++++ b/caribou/data_collector/components/provider/provider_retriever.py
+@@ -32,9 +32,7 @@ class ProviderRetriever(DataRetriever):  # pylint: disable=too-many-instance-att
+         provider = os.environ.get("CARIBOU_DEFAULT_PROVIDER", Provider.AWS.value)
+         if not self._integration_test_on:
+             self._google_api_key = os.environ.get("GOOGLE_API_KEY")
+-            if self._google_api_key is None and not self._integration_test_on:
+-                raise ValueError("GOOGLE_API_KEY environment variable not set")
+-
++
+         if provider == Provider.GCP.value:
+             self._gcp_region_name_to_code: dict[str, str] = {}
+             self._gcp_catalog_client: billing_v1.CloudCatalogClient = billing_v1.CloudCatalogClient()
+@@ -128,7 +126,18 @@ class ProviderRetriever(DataRetriever):  # pylint: disable=too-many-instance-att
+                 # Skip regions that are not enabled for the current account
+                 continue
+
+-            coordinates = self.retrieve_location(region_name)
++            if self._google_api_key is None:
++                # Without a Google API key: only the simulated regions, with fixed coordinates
++                fallback_coordinates = {
++                    "us-east-1": (39.04, -77.49),     # Ashburn, Virginia
++                    "eu-central-1": (50.11, 8.68),    # Frankfurt am Main
++                }
++                if region_code not in fallback_coordinates:
++                    continue
++                coordinates = fallback_coordinates[region_code]
++            else:
++                coordinates = self.retrieve_location(region_name)
++
+             regions[f"{Provider.AWS.value}:{region_code}"] = {
+                 "name": region_name,
+                 "provider": Provider.AWS.value,
+@@ -1208,23 +1217,20 @@ class ProviderRetriever(DataRetriever):  # pylint: disable=too-many-instance-att
+         invocation_duration_free_tier_sku = ""
+
+         for product in price_list_file_json["products"].values():
+-            if (
+-                product["attributes"]["group"] == "AWS-Lambda-Requests-ARM"
+-                and product["attributes"]["location"] != "Any"
+-            ):
++            attributes = product.get("attributes", {})
++            group = attributes.get("group", "")
++            location = attributes.get("location", "")
++            if group == "AWS-Lambda-Requests-ARM" and location != "Any":
+                 invocation_call_sku_arm64 = product["sku"]
+-            if (
+-                product["attributes"]["group"] == "AWS-Lambda-Duration-ARM"
+-                and product["attributes"]["location"] != "Any"
+-            ):
++            if group == "AWS-Lambda-Duration-ARM" and location != "Any":
+                 invocation_duration_sku_arm64 = product["sku"]
+-            if product["attributes"]["group"] == "AWS-Lambda-Requests" and product["attributes"]["location"] != "Any":
++            if group == "AWS-Lambda-Requests" and location != "Any":
+                 invocation_call_sku_x86_64 = product["sku"]
+-            if product["attributes"]["group"] == "AWS-Lambda-Duration" and product["attributes"]["location"] != "Any":
++            if group == "AWS-Lambda-Duration" and location != "Any":
+                 invocation_duration_sku_x86_64 = product["sku"]
+-            if product["attributes"]["group"] == "AWS-Lambda-Requests" and product["attributes"]["location"] == "Any":
++            if group == "AWS-Lambda-Requests" and location == "Any":
+                 invocation_call_free_tier_sku = product["sku"]
+-            if product["attributes"]["group"] == "AWS-Lambda-Duration" and product["attributes"]["location"] == "Any":
++            if group == "AWS-Lambda-Duration" and location == "Any":
+                 invocation_duration_free_tier_sku = product["sku"]
+
+         return (
+diff --git a/caribou/deployment_solver/deployment_input/components/loaders/workflow_loader.py b/caribou/deployment_solver/deployment_input/components/loaders/workflow_loader.py
+--- a/caribou/deployment_solver/deployment_input/components/loaders/workflow_loader.py
++++ b/caribou/deployment_solver/deployment_input/components/loaders/workflow_loader.py
+@@ -54,8 +54,12 @@ class WorkflowLoader(InputLoader):
+
+     def get_workflow_placement_decision_size(self) -> float:
+         # Workflow Placement Decision Size
+-        return self._workflow_data.get("start_hop_summary", {}).get("workflow_placement_decision_size_gb", 0.0)
+-
++        value = self._workflow_data.get("start_hop_summary", {}).get("workflow_placement_decision_size_gb", 0.0)
++        if isinstance(value, list):
++            # Caribou leaves an empty list if no measurement is available
++            return sum(value) / len(value) if value else 0.0
++        return value
++
+     def get_start_hop_retrieve_wpd_probability(self) -> float:
+         return self._workflow_data.get("start_hop_summary", {}).get(
+             "wpd_at_function_probability", 1

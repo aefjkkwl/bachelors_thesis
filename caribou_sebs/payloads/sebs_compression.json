@@ -1,0 +1,10 @@
+{
+  "bucket": {
+    "bucket": "BUCKET",
+    "input": "compression/input",
+    "output": "compression/output"
+  },
+  "object": {
+    "key": "acmart-master"
+  }
+}

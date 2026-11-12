@@ -1,0 +1,11 @@
+{
+  "bucket": {
+    "bucket": "BUCKET",
+    "input": "image-recognition/input",
+    "model": "image-recognition/model"
+  },
+  "object": {
+    "model": "resnet50-19c8e357.pth",
+    "input": "800px-Porsche_991_silver_IAA.jpg"
+  }
+}

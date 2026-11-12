@@ -1,0 +1,10 @@
+{
+  "bucket": {
+    "bucket": "BUCKET",
+    "input": "dna/input",
+    "output": "dna/output"
+  },
+  "object": {
+    "key": "bacillus_subtilis.fasta"
+  }
+}

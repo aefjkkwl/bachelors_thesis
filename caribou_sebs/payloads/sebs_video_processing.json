@@ -1,0 +1,12 @@
+{
+  "bucket": {
+    "bucket": "BUCKET",
+    "input": "video/input",
+    "output": "video/output"
+  },
+  "object": {
+    "key": "city.mp4",
+    "op": "watermark",
+    "duration": 1
+  }
+}

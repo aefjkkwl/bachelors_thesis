@@ -1,0 +1,54 @@
+"""
+Setzt in .caribou/config.yml aller SeBS-Workflows die home_region um.
+Nur der home_region-Block wird geaendert, allowed_regions bleibt unveraendert.
+
+Aufruf (im Ordner caribou_sebs):
+    poetry run python set_home_region.py eu-central-1
+    poetry run python set_home_region.py eu-central-1 --only sebs_graph_bfs
+"""
+import argparse
+import re
+from pathlib import Path
+
+
+def set_home_region(config: Path, region: str) -> str | None:
+    lines = config.read_text(encoding="utf-8").splitlines(keepends=True)
+    for i, line in enumerate(lines):
+        if not re.match(r"\s*home_region\s*:", line):
+            continue
+        indent = len(line) - len(line.lstrip())
+        # Block unter home_region durchsuchen, bis die Einrueckung wieder zurueckgeht
+        for j in range(i + 1, len(lines)):
+            sub = lines[j]
+            if sub.strip() and len(sub) - len(sub.lstrip()) <= indent:
+                break
+            m = re.match(r'(\s*region\s*:\s*)["\']?([^"\'\s]+)["\']?(.*)', sub.rstrip("\r\n"))
+            if m:
+                old = m.group(2)
+                end = sub[len(sub.rstrip("\r\n")):]
+                lines[j] = f'{m.group(1)}"{region}"{m.group(3)}{end}'
+                config.write_text("".join(lines), encoding="utf-8")
+                return old
+    return None
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("region", help="neue Home-Region, z. B. eu-central-1")
+    ap.add_argument("--only", nargs="*", help="nur diese Workflow-Ordner")
+    args = ap.parse_args()
+
+    folders = sorted(p for p in Path(".").iterdir() if p.is_dir() and p.name.startswith("sebs_"))
+    if args.only:
+        folders = [p for p in folders if p.name in args.only]
+    for wf in folders:
+        cfg = wf / ".caribou" / "config.yml"
+        if not cfg.exists():
+            print(f"{wf.name:30s} config.yml fehlt")
+            continue
+        old = set_home_region(cfg, args.region)
+        print(f"{wf.name:30s} " + (f"{old} -> {args.region}" if old else "home_region NICHT gefunden"))
+
+
+if __name__ == "__main__":
+    main()

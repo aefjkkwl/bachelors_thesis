@@ -1,0 +1,40 @@
+workflow_name: "sebs_video_processing"
+workflow_version: "3.0.0"
+environment_variables:
+  - key: "SEBS_BUCKET_REGION"
+    value: "us-east-1"
+iam_policy_file: "iam_policy.json"
+home_region:
+  provider: "aws"
+  region: "us-east-1"
+estimated_invocations_per_month: 1000000
+constraints:
+  hard_resource_constraints:
+    cost: null
+    runtime: null
+    carbon: null
+  soft_resource_constraints:
+    cost: null
+    runtime: null
+    carbon: null
+  priority_order:
+    - carbon
+    - runtime
+    - cost
+regions_and_providers:
+  allowed_regions:
+    - provider: "aws"
+      region: "eu-central-1"
+    - provider: "aws"
+      region: "us-east-1"
+  disallowed_regions:
+  providers:
+    aws:
+      config:
+        timeout: 600
+        memory: 3008
+        additional_docker_commands:
+          - "pip3 install --no-cache-dir imageio-ffmpeg==0.5.1"
+          - "mkdir -p src/sebs_fn/ffmpeg"
+          - "cp \"$(python3 -c 'import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())')\" src/sebs_fn/ffmpeg/ffmpeg"
+          - "chmod 755 src/sebs_fn/ffmpeg/ffmpeg"
