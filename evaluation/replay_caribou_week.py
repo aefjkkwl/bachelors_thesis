@@ -1,33 +1,34 @@
 """
-Replay: Caribous Platzierungsentscheidungen fuer die simulierte Woche (25.-31.08.2025).
+replay_caribou_week.py
+======================
+Replays Caribou's placement decisions for the simulated week (25 to 31 August 2025)
+(thesis, Section 4.2.2).
 
-Caribou plant normalerweise einmal pro Tag einen 24-Stunden-Plan und wartet danach
-24 echte Stunden. Dieses Skript erzeugt die 7 Tagesplaene direkt hintereinander:
+Caribou normally plans a 24-hour schedule once per day and then waits 24 real hours.
+This script creates the seven daily plans directly one after another:
 
-  pro simuliertem Tag
-    1. Carbon-Collector laufen lassen (der Patch in carbon_retriever.py laedt das
-       7-Tage-Fenster vor dem simulierten Tag und rueckt danach einen Tag weiter)
-    2. Caribous unveraenderten Solver fuer jeden Workflow mit allen 24 Stunden starten
-    3. Die gewaehlte Region pro Stunde und Funktion speichern
+  per simulated day
+    1. Run the carbon collector (the patch in carbon_retriever.py loads the 7-day
+       window before the simulated day and then advances by one day)
+    2. Run Caribou's unchanged solver for every workflow with all 24 hours
+    3. Store the chosen region per hour and function
 
-Caribous Entscheidungslogik wird nicht veraendert. Umgangen werden nur die Wartezeit
-des Deployment-Managers (24 h) und sein Token-Budget: Der Solver plant jede Stunde.
+Caribou's decision logic is not changed. Only the waiting time of the deployment
+manager (24 h) and its token budget are bypassed: the solver plans every hour.
 
-Voraussetzungen (wie bei einem normalen Caribou-Durchlauf):
-  - Workflows in der home_region (us-east-1) deployt und mind. 10x aufgerufen
-  - poetry run caribou log_sync               (Aufrufe in Caribous Tabellen uebertragen)
-  - poetry run caribou data_collect --collector all   (mindestens einmal zuvor)
-  - Umgebungsvariable ELECTRICITY_MAPS_AUTH_TOKEN gesetzt (wie bei data_collect)
+Prerequisites (as for a regular Caribou run, with caribou/caribou_changes.patch applied):
+  - workflows deployed in the home_region (us-east-1) and invoked at least 10 times
+  - poetry run caribou log_sync               (transfer the invocations to Caribou's tables)
+  - poetry run caribou data_collect --collector all   (at least once before)
 
-Aufruf im Caribou-Repo (caribou-main):
-  poetry run python replay_caribou_week.py
-  poetry run python replay_caribou_week.py --prefix sebs_ --out caribou_replay
-  poetry run python replay_caribou_week.py --version 1.0.0 --out caribou_replay_home_eu
+Usage (from the root of the patched Caribou repository):
+  poetry run python <REPO>/evaluation/replay_caribou_week.py --out <REPO>/results/caribou_replay_home_us
+  poetry run python <REPO>/evaluation/replay_caribou_week.py --version 2.0.0 --out <REPO>/results/caribou_replay_home_eu
 
-Ergebnis (Ordner --out):
+Output (folder --out):
   placements.csv   sim_date, hour_utc, workflow_id, instance, provider, region
-  metrics.csv      sim_date, hour_utc, workflow_id, Kennzahlen des gewaehlten Plans
-  run_info.json    Einstellungen dieses Laufs
+  metrics.csv      sim_date, hour_utc, workflow_id, metrics of the chosen plan
+  run_info.json    settings of this run
 """
 import argparse
 import csv
@@ -58,7 +59,7 @@ ALL_HOURS = [str(h) for h in range(24)]
 def get_workflow_ids(endpoints: Endpoints, prefix: str, versions: list[str] | None = None) -> list[str]:
     keys = endpoints.get_deployment_manager_client().get_keys(DEPLOYMENT_MANAGER_RESOURCE_TABLE)
     ids = [k for k in keys if k.startswith(prefix)]
-    if versions:  # nur Workflows mit dieser Version (Teil nach dem letzten "-")
+    if versions:  # only workflows with this version (part after the last "-")
         ids = [k for k in ids if k.rsplit("-", 1)[-1] in versions]
     return sorted(ids)
 
@@ -88,7 +89,7 @@ def reset_sim_day() -> None:
 def run_solver(workflow_config: WorkflowConfig, calculator_type: str) -> None:
     algorithm_class = deployment_algorithm_mapping.get(workflow_config.deployment_algorithm)
     if algorithm_class is None:
-        raise ValueError(f"Unbekannter Algorithmus: {workflow_config.deployment_algorithm}")
+        raise ValueError(f"Unknown algorithm: {workflow_config.deployment_algorithm}")
     algorithm = algorithm_class(
         workflow_config,
         DEFAULT_MONITOR_COOLDOWN,
@@ -103,42 +104,42 @@ def read_solver_result(endpoints: Endpoints, workflow_id: str) -> dict:
         WORKFLOW_PLACEMENT_SOLVER_STAGING_AREA_TABLE, workflow_id
     )
     if not raw:
-        raise RuntimeError(f"Kein Solver-Ergebnis fuer {workflow_id} gefunden")
+        raise RuntimeError(f"No solver result found for {workflow_id}")
     return json.loads(raw)
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Caribou-Replay fuer die simulierte Woche")
-    ap.add_argument("--prefix", default="sebs_", help="nur Workflows mit diesem Namensanfang")
-    ap.add_argument("--out", default="caribou_replay", help="Ausgabeordner")
+    ap = argparse.ArgumentParser(description="Caribou replay for the simulated week")
+    ap.add_argument("--prefix", default="sebs_", help="only workflows whose name starts with this prefix")
+    ap.add_argument("--out", default="caribou_replay", help="output folder")
     ap.add_argument("--version", nargs="+",
-                    help="nur Workflows mit dieser Version, z. B. --version 1.0.0")
-    ap.add_argument("--seed", type=int, default=42, help="Zufallsstartwert fuer den Solver")
+                    help="only workflows with this version, e.g. --version 1.0.0")
+    ap.add_argument("--seed", type=int, default=42, help="random seed for the solver")
     ap.add_argument("--calculator", default="simple", choices=["simple", "go"],
-                    help="Caribous Metrics-Calculator (Standard wie Deployment-Manager: simple)")
+                    help="Caribou's metrics calculator (default as in the deployment manager: simple)")
     ap.add_argument("--no-reset", action="store_true",
-                    help="sim_day_state.json nicht zuruecksetzen (sonst Start bei Tag 0 = 25.08.)")
+                    help="do not reset sim_day_state.json (otherwise start at day 0 = 25 August)")
     ap.add_argument("--keep-staging", action="store_true",
-                    help="Solver-Ergebnisse nach dem Lauf nicht aus Caribous Staging-Tabelle entfernen")
+                    help="do not remove the solver results from Caribou's staging table after the run")
     args = ap.parse_args()
 
     endpoints = Endpoints()
     workflow_ids = get_workflow_ids(endpoints, args.prefix, args.version)
     if not workflow_ids:
-        sys.exit(f"Keine deployten Workflows mit Praefix '{args.prefix}' gefunden.")
+        sys.exit(f"No deployed workflows with prefix '{args.prefix}' found.")
     print(f"Workflows ({len(workflow_ids)}): {', '.join(workflow_ids)}")
 
     if not args.no_reset:
         reset_sim_day()
-        print("Simulierter Tag zurueckgesetzt (Start: Tag 0).")
+        print("Simulated day reset (start: day 0).")
 
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Messdaten der Workflows einmal aktualisieren (wie im Deployment-Manager vor jedem Solve)
+    # update the workflow measurements once (as the deployment manager does before each solve)
     workflow_collector = WorkflowCollector()
     for wf in workflow_ids:
-        print(f"Workflow-Daten sammeln: {wf}")
+        print(f"Collecting workflow data: {wf}")
         workflow_collector.run_on_workflow(wf)
 
     week_start: date = patched_retriever._SIM_WEEK_START  # pylint: disable=protected-access
@@ -150,15 +151,15 @@ def main() -> None:
     for step in range(n_days):
         day_index = read_sim_day_index()
         sim_date = week_start + timedelta(days=day_index)
-        print(f"\n=== Simulierter Tag {day_index + 1}/{n_days}: {sim_date.isoformat()} ===")
+        print(f"\n=== Simulated day {day_index + 1}/{n_days}: {sim_date.isoformat()} ===")
 
-        # 1. Carbon-Daten fuer diesen Tag (Patch rueckt danach einen Tag weiter)
+        # 1. carbon data for this day (the patch then advances by one day)
         CarbonCollector().run()
         if read_sim_day_index() == day_index:
-            sys.exit("Der simulierte Tag wurde nicht weitergeschaltet. Ist der Patch in "
-                     "carbon_retriever.py aktiv und sind eu-central-1/us-east-1 in CUSTOM_REGION_CSV_MAP?")
+            sys.exit("The simulated day was not advanced. Is the patch in "
+                     "carbon_retriever.py applied and are eu-central-1/us-east-1 in CUSTOM_REGION_CSV_MAP?")
 
-        # 2. + 3. Solver je Workflow, Ergebnis einsammeln
+        # 2. + 3. solver per workflow, collect the result
         for wf in workflow_ids:
             random.seed(args.seed + step)
             np.random.seed(args.seed + step)
@@ -180,7 +181,7 @@ def main() -> None:
                 metric_rows.append({"sim_date": sim_date.isoformat(), "hour_utc": int(hour),
                                     "workflow_id": wf, **metrics})
 
-        # Zwischenstand nach jedem Tag sichern
+        # save intermediate results after every day
         write_csv(out_dir / "placements.csv", placement_rows)
         write_csv(out_dir / "metrics.csv", metric_rows)
 
@@ -188,7 +189,7 @@ def main() -> None:
         client = endpoints.get_deployment_algorithm_workflow_placement_decision_client()
         for wf in workflow_ids:
             client.remove_key(WORKFLOW_PLACEMENT_SOLVER_STAGING_AREA_TABLE, wf)
-        print("\nSolver-Ergebnisse aus Caribous Staging-Tabelle entfernt (keine echte Migration).")
+        print("\nSolver results removed from Caribou's staging table (no actual migration).")
 
     with open(out_dir / "run_info.json", "w", encoding="utf-8") as f:
         json.dump({
@@ -199,10 +200,10 @@ def main() -> None:
             "solve_hours": ALL_HOURS,
             "seed": args.seed,
             "calculator": args.calculator,
-            "token_budget": "umgangen (Solver plant jede Stunde)",
+            "token_budget": "bypassed (solver plans every hour)",
         }, f, indent=2)
 
-    print(f"\nFertig. {len(placement_rows)} Platzierungen in {out_dir / 'placements.csv'}")
+    print(f"\nDone. {len(placement_rows)} placements in {out_dir / 'placements.csv'}")
     summarize(placement_rows)
 
 
@@ -225,7 +226,7 @@ def summarize(rows: list[dict]) -> None:
     for r in rows:
         counts.setdefault(r["workflow_id"], {}).setdefault(r["region"], 0)
         counts[r["workflow_id"]][r["region"]] += 1
-    print("\nStunden pro Region (ueber die Woche):")
+    print("\nHours per region (over the week):")
     for wf, regions in sorted(counts.items()):
         print(f"  {wf:32s} " + ", ".join(f"{reg}: {n}" for reg, n in sorted(regions.items())))
 
