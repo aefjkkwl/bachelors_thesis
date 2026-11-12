@@ -1,7 +1,7 @@
 """
 compare_zones.py
 ================
-Selects the region pair and evaluation week (thesis, Section 3.3.1.2).
+Selects the region pair and evaluation week (thesis, Section 4.1.2).
 
 Compares the hourly carbon intensity of all Electricity Maps zones in a folder
 pairwise and ranks the pairs by their suitability for a "stable vs. fluctuating

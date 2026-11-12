@@ -1,7 +1,7 @@
 # Changes to Caribou
 
 This folder contains only the changes made to Caribou for the thesis, not Caribou itself
-(thesis, Section 4.2 and Appendix).
+(thesis, Section 4.2).
 
 - Upstream repository: https://github.com/ubc-cirrus-lab/caribou
 - Base version: `main` branch, downloaded on 3 September 2026

@@ -4,7 +4,7 @@ reconstruct_ecolife.py
 ======================
 Reconstructs from EcoLife's result files (carbon_*.json and st_*.json) how its
 emissions are composed: execution vs. idle time (keep-alive), operational vs.
-embodied, cold starts, chosen hardware and service time (thesis, Section 3.3.3).
+embodied, cold starts, chosen hardware and service time (thesis, Section 4.3).
 EcoLife itself only reports total emissions.
 
 Why this works

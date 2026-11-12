@@ -2,7 +2,7 @@
 evaluate_carbon.py
 ==================
 Computes the emissions of the Baseline and Caribou setups with EcoLife's carbon
-model and the Azure Functions trace (thesis, Sections 3.3.1 and 3.3.2).
+model and the Azure Functions trace (thesis, Sections 4.1 and 4.2).
 
 For every Azure function and every minute of the trace:
   1. Region: from placements.csv (Caribou's plan for this SeBS function in this

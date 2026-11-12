@@ -18,7 +18,7 @@ Assumptions (as in Caribou's carbon_calculator.py)
 3. Route CI:
       invocation in the home region   -> CI of the home region in that hour
       invocation in the other region  -> mean of home-region CI and target-region CI
-4. Two cases as in the Caribou paper (Section 9.2):
+4. Two cases as in the Caribou paper (Section 7.1):
       best : 0.001 kWh/GB for every transfer, including intra-region
       worst: 0.005 kWh/GB between regions, 0 within a region
 5. Invocations per app and hour come from the same Azure traces as in
@@ -27,7 +27,7 @@ Assumptions (as in Caribou's carbon_calculator.py)
 
 The script must therefore be located in the same folder as evaluate_carbon.py.
 
-Usage (from the repository root; the result in the thesis, Section 6.8)
+Usage (from the repository root; the result in the thesis, Section 7.4.2)
 -----------------------------------------------------------------------
 python evaluation/transmission_carbon.py \
   --transfer results/transfer_sizes.csv \
