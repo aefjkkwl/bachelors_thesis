@@ -1,79 +1,78 @@
-# SeBS-Funktionen aus EcoLife als Caribou-Workflows
+# SeBS Functions of EcoLife as Caribou Workflows
 
-Die 10 SeBS-Benchmarks, die EcoLife verwendet, jeweils als eigener Caribou-Workflow mit einer Funktion. Die Rechenlogik (`src/sebs_fn/function.py`) ist unverändert aus SeBS (github.com/spcl/serverless-benchmarks) übernommen. Ergänzt sind nur:
+The ten SeBS benchmarks used by EcoLife, each wrapped as a Caribou workflow with a single
+function (thesis, Sections 4.1.4 and 4.2.1). The computation (`src/sebs_fn/function.py`) is
+taken unchanged from SeBS (https://github.com/spcl/serverless-benchmarks). Only the
+following was added:
 
-- `app.py`: Caribou-Gerüst, ruft den SeBS-`handler` auf und gibt nur Messwerte zurück
-- `src/sebs_fn/storage.py`: SeBS-S3-Anbindung, S3-Client fest in der Bucket-Region
-  (`SEBS_BUCKET_REGION`), damit der Zugriff auch nach einer Regionsverschiebung klappt
-- `.caribou/config.yml`: Regionen `eu-central-1` + `us-east-1`, Heimatregion `us-east-1`,
-  Priorität carbon → runtime → cost, 3008 MB Speicher, 600 s Timeout (für alle gleich)
+- `app.py`: Caribou scaffolding that calls the SeBS `handler` and returns only measurements
+- `src/sebs_fn/storage.py`: SeBS S3 wrapper with the S3 client fixed to the bucket region
+  (`SEBS_BUCKET_REGION`), so that data access still works after Caribou moves the function
+  to another region
+- `.caribou/config.yml`: regions `eu-central-1` and `us-east-1`, home region `us-east-1`,
+  priority order carbon, runtime, cost, 3008 MB memory, 600 s timeout (same for all)
 
-## Zuordnung und Eingaben
+## Mapping and inputs
 
-| EcoLife | Workflow | Eingabe | Beleg |
+| EcoLife | Workflow | Input | Source |
 |---|---|---|---|
-| dynamic-100k | sebs_dynamic_html | `random_len = 100000` | aus Namen |
-| pagerank-1000k | sebs_graph_pagerank | 1.000.000 Knoten, ohne Seed | aus Namen |
-| mst-1000k | sebs_graph_mst | 1.000.000 Knoten, ohne Seed | aus Namen |
-| bfs-1000k | sebs_graph_bfs | 1.000.000 Knoten, ohne Seed | aus Namen |
-| upload-img | sebs_uploader | `Jammlich_crop.jpg`, 960px | bestätigt (bench_aws), Ersatzdatei |
-| thumbnailer | sebs_thumbnailer | `3_aerial-shot-architecture-bridge-2887493.jpg`, 200×200 | bestätigt (bench_aws) |
-| video | sebs_video_processing | `city.mp4`, `watermark`, 1 s | bestätigt (bench_aws) |
-| compression | sebs_compression | `acmart-master` | bestätigt (bench_aws) |
-| image-recog | sebs_image_recognition | `resnet50-19c8e357.pth`, `800px-Porsche_991_silver_IAA.jpg` | bestätigt (bench_aws) |
-| dna | sebs_dna_visualisation | `bacillus_subtilis.fasta` | bestätigt (bench_aws) |
+| dynamic-100k | sebs_dynamic_html | `random_len = 100000` | EcoLife profile name |
+| pagerank-1000k | sebs_graph_pagerank | 1,000,000 nodes, no seed | EcoLife profile name |
+| mst-1000k | sebs_graph_mst | 1,000,000 nodes, no seed | EcoLife profile name |
+| bfs-1000k | sebs_graph_bfs | 1,000,000 nodes, no seed | EcoLife profile name |
+| upload-img | sebs_uploader | `Jammlich_crop.jpg`, 960 px | bench_aws, replacement file |
+| thumbnailer | sebs_thumbnailer | `3_aerial-shot-architecture-bridge-2887493.jpg`, 200×200 | bench_aws |
+| video | sebs_video_processing | `city.mp4`, `watermark`, 1 s | bench_aws |
+| compression | sebs_compression | `acmart-master` | bench_aws |
+| image-recog | sebs_image_recognition | `resnet50-19c8e357.pth`, `800px-Porsche_991_silver_IAA.jpg` | bench_aws |
+| dna | sebs_dna_visualisation | `bacillus_subtilis.fasta` | bench_aws |
 
-Die EcoLife-Autoren haben auf Anfrage auf ihr Benchmark-Setup verwiesen: github.com/LukeJYK/bench_aws (Commit `66c4850`, 23.08.2023). Die `event.json` pro Funktion darin bestätigt die Eingaben von 6 Funktionen (Y. Jiang, persönliche Kommunikation, 07.10.2026).
+On request, the EcoLife authors referred to their benchmark setup
+(https://github.com/LukeJYK/bench_aws, commit `66c4850`, 23 August 2023). Its `event.json`
+per function confirms the inputs of six functions (Y. Jiang, personal communication,
+7 October 2026).
 
-Hinweise:
+Notes:
 
-- **upload-img:** `bench_aws` verwendet die 800px-Version des Bildes. Wikimedia liefert diese Größe nicht mehr aus, daher die 960px-Version wie in SeBS seit Juli 2026 (Datei 14 % größer).
-- **dynamic-html und Graph-Funktionen:** Die Größe folgt den Namen in EcoLifes Messdaten (`100k`, `1000k`). `bench_aws` nennt andere Werte (10 bzw. 100.000), das Repository wurde aber für ein Poster auf der MUG'23 erstellt.
-- **Kein Seed** bei den Graph-Funktionen, wie bei EcoLife (`bench_aws/501.graph-pagerank/function.py`). Jeder Aufruf erzeugt einen neuen Zufallsgraphen gleicher Größe (`Barabasi(size, 10)`). Die drei Graph-Payloads enthalten deshalb nur `"size"`.
+- **upload-img:** `bench_aws` uses the 800 px version of the image. Wikimedia no longer
+  serves this size, so the 960 px version is used, as in SeBS since July 2026 (file 14% larger).
+- **dynamic-html and graph functions:** The size follows the names in EcoLife's profiling
+  data (`100k`, `1000k`). `bench_aws` states other values (10 and 100,000).
+- **No seed** for the graph functions, as in EcoLife (`bench_aws/501.graph-pagerank/function.py`).
+  Every invocation creates a new random graph of the same size (`Barabasi(size, 10)`), so the
+  three graph payloads contain only `"size"`.
 
-Ausführliche Begründung aller Eingaben: Dokument „Begründung der Funktionseingaben (SeBS/EcoLife)“.
+## Steps
 
-## Ablauf
+All commands run in Caribou's Poetry environment.
 
-Alles im Caribou-Poetry-Umfeld (dort, wo du bisher `poetry run caribou ...` ausführst).
-Am einfachsten diesen Ordner in dein Caribou-Repo kopieren, z. B. nach `benchmarks/sebs/`.
-
-**1. Eingabedaten nach S3 laden** (einmalig)
+**1. Upload the input data to S3** (once)
 
     git clone https://github.com/spcl/serverless-benchmarks-data.git
-    poetry run python upload_inputs.py --bucket DEIN-BUCKET --region us-east-1 --data PFAD\serverless-benchmarks-data
+    poetry run python upload_inputs.py --bucket YOUR-BUCKET --region us-east-1 --data PATH/serverless-benchmarks-data
 
-Legt den Bucket an (falls nötig), lädt ~150 MB hoch und schreibt `payloads_final/`.
-Nimmst du eine andere Region als `us-east-1`, musst du `SEBS_BUCKET_REGION` in allen
-`config.yml` anpassen.
+This creates the bucket if necessary, uploads about 150 MB and writes `payloads_final/` from
+the templates in `payloads/`. If a region other than `us-east-1` is used,
+`SEBS_BUCKET_REGION` must be changed in all `config.yml` files.
 
-**2. Deployen** (pro Workflow; Docker muss laufen)
+**2. Deploy** (per workflow, Docker must be running)
 
     cd sebs_dynamic_html
     poetry run caribou deploy
 
-Wie bei deinem bisherigen Setup deployt `deploy` nur in die `home_region`. Damit die
-Funktion in beiden Regionen existiert: `home_region` auf `eu-central-1` ändern und
-erneut deployen (danach zurück auf `us-east-1`).
+`deploy` deploys only to the `home_region`. To have the function in both regions, set the
+home region to `eu-central-1` with `set_home_region.py`, deploy again and switch back to
+`us-east-1`. `sync_version.py` changes the workflow version in `app.py` and `config.yml`
+at once.
 
-Reihenfolge-Empfehlung: zuerst `sebs_dynamic_html` komplett durchziehen (deploy + run),
-dann die übrigen. `sebs_image_recognition` ist am größten (PyTorch, Image > 1 GB),
-`sebs_video_processing` lädt beim Build ein ffmpeg-Binary (`imageio-ffmpeg`).
-
-**3. Aufrufen, damit Caribou Messwerte sammelt**
+**3. Invoke the workflows so that Caribou collects measurements**
 
     poetry run python invoke_runs.py --only sebs_dynamic_html
-    poetry run python invoke_runs.py            # alle, je 10 Aufrufe
+    poetry run python invoke_runs.py            # all, 10 invocations each
 
-**4. Prüfen**
+**4. Check**
 
-In CloudWatch (Log-Gruppe der Funktion) gibt jeder Aufruf eine Zeile wie
-`{"status": 200, "benchmark": "dynamic-100k", "sebs_duration_s": ...}` aus.
+    poetry run python check_logs.py --hours 2
 
-## Lokal getestet
-
-Mit simuliertem S3 und Caribou-Platzhalter liefen `dynamic_html`, `thumbnailer`,
-`compression` und `video_processing` vollständig durch, inklusive Upload-Skript und
-Payload-Pfaden. Die übrigen 6 (Graphen, DNA, Image-Recognition, Uploader) sind
-syntaktisch geprüft. Ihre Bibliotheken (igraph, squiggle, torch) konnten lokal nicht
-installiert werden, sie werden erst beim Docker-Build auf deinem Rechner getestet.
+Every successful invocation writes a line such as
+`{"status": 200, "benchmark": "dynamic-100k", "sebs_duration_s": ...}` to CloudWatch.

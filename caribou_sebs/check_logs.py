@@ -1,3 +1,11 @@
+"""
+Checks the CloudWatch logs of the deployed SeBS functions: number of successful
+invocations, errors and cold starts in the last hours, and the first error message
+of each function.
+
+Usage:
+    poetry run python check_logs.py --hours 2 --region us-east-1
+"""
 import argparse
 import time
 
@@ -32,17 +40,17 @@ def main():
     functions = sorted(f["FunctionName"] for page in lam.get_paginator("list_functions").paginate()
                        for f in page["Functions"] if f["FunctionName"].startswith(args.prefix))
     if not functions:
-        print(f"Keine Lambda-Funktionen mit Praefix '{args.prefix}' in {args.region} gefunden.")
+        print(f"No Lambda functions with prefix '{args.prefix}' found in {args.region}.")
         return
 
-    print(f"Letzte {args.hours:g} h, Region {args.region}\n")
-    print(f"{'Funktion':60s} {'OK':>4s} {'Fehler':>7s} {'Kalt':>5s}")
+    print(f"Last {args.hours:g} h, region {args.region}\n")
+    print(f"{'Function':60s} {'OK':>4s} {'Errors':>7s} {'Cold':>5s}")
     problems = []
     for fn in functions:
         group = f"/aws/lambda/{fn}"
         ok, _ = count(logs, group, '"sebs_duration_s"', start_ms)
         if ok == -1:
-            print(f"{fn:60s}  (noch keine Logs)")
+            print(f"{fn:60s}  (no logs yet)")
             continue
         err, first_err = count(logs, group, '?Traceback ?ERROR ?"Task timed out"', start_ms)
         cold, _ = count(logs, group, '"Init Duration"', start_ms)
@@ -51,11 +59,11 @@ def main():
             problems.append((fn, first_err))
 
     if problems:
-        print("\nErste Fehlermeldung je Funktion:")
+        print("\nFirst error message per function:")
         for fn, msg in problems:
             print(f"\n--- {fn}\n{msg[:800]}")
     else:
-        print("\nKeine Fehler gefunden.")
+        print("\nNo errors found.")
 
 
 if __name__ == "__main__":

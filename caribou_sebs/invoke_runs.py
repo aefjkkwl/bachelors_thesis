@@ -1,15 +1,15 @@
 """
-Ruft die deployten SeBS-Workflows mehrfach ueber Caribou auf, damit Caribou
-genug Messwerte (Laufzeit, Datenmengen) fuer seine Platzierungsentscheidung hat.
+Invokes the deployed SeBS workflows repeatedly through Caribou so that Caribou
+collects enough measurements (runtime, data volumes) for its placement decision.
 
-Mehrere Aufrufe kurz hintereinander sind noetig: Caribou verwirft Laeufe mit
-Kaltstart ("Init Duration"), die ersten Aufrufe zaehlen also meist nicht.
+Several invocations in quick succession are needed: Caribou discards runs with a
+cold start ("Init Duration"), so the first invocations usually do not count.
 
-Die Version jedes Workflows wird aus seiner .caribou/config.yml gelesen
-(workflow_version), muss also nicht fuer alle gleich sein.
+The version of each workflow is read from its .caribou/config.yml
+(workflow_version), so it does not have to be the same for all workflows.
 
-Aufruf (im Caribou-Poetry-Umfeld, aus diesem Ordner):
-    poetry run python invoke_runs.py                      # alle 10, je 10 Aufrufe
+Usage (in Caribou's Poetry environment, from this folder):
+    poetry run python invoke_runs.py                      # all 10, 10 invocations each
     poetry run python invoke_runs.py --runs 5 --only sebs_dynamic_html sebs_graph_bfs
 """
 import argparse
@@ -28,20 +28,20 @@ def read_version(workflow_dir: str) -> str:
             m = re.match(r'\s*workflow_version:\s*["\']?([^"\'\s]+)', line)
             if m:
                 return m.group(1)
-    raise SystemExit(f"workflow_version nicht gefunden in {config_path}")
+    raise SystemExit(f"workflow_version not found in {config_path}")
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", type=int, default=10)
-    ap.add_argument("--pause", type=float, default=5.0, help="Sekunden zwischen Aufrufen")
-    ap.add_argument("--only", nargs="*", help="nur diese Workflows (Ordnernamen)")
+    ap.add_argument("--pause", type=float, default=5.0, help="seconds between invocations")
+    ap.add_argument("--only", nargs="*", help="only these workflows (folder names)")
     args = ap.parse_args()
 
     here = os.path.dirname(os.path.abspath(__file__))
     pdir = os.path.join(here, "payloads_final")
     if not os.path.isdir(pdir):
-        raise SystemExit("payloads_final/ fehlt - zuerst upload_inputs.py ausfuehren.")
+        raise SystemExit("payloads_final/ is missing - run upload_inputs.py first.")
 
     workflows = sorted(f[:-5] for f in os.listdir(pdir) if f.endswith(".json"))
     if args.only:
@@ -50,15 +50,15 @@ def main():
     for wf in workflows:
         version = read_version(os.path.join(here, wf))
         payload = open(os.path.join(pdir, wf + ".json"), encoding="utf-8").read()
-        payload = json.dumps(json.loads(payload))  # kompakt, eine Zeile
+        payload = json.dumps(json.loads(payload))  # compact, one line
         print(f"\n== {wf}-{version}")
         client = Client(f"{wf}-{version}")
         for i in range(1, args.runs + 1):
             try:
                 client.run(payload)
-                print(f"  Aufruf {i}/{args.runs} abgeschickt")
-            except Exception as e:  # weiter mit dem naechsten Aufruf
-                print(f"  Aufruf {i}/{args.runs} FEHLER: {e}")
+                print(f"  invocation {i}/{args.runs} sent")
+            except Exception as e:  # continue with the next invocation
+                print(f"  invocation {i}/{args.runs} ERROR: {e}")
             time.sleep(args.pause)
 
 

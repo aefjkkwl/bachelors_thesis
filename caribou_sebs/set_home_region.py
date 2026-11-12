@@ -1,8 +1,8 @@
 """
-Setzt in .caribou/config.yml aller SeBS-Workflows die home_region um.
-Nur der home_region-Block wird geaendert, allowed_regions bleibt unveraendert.
+Sets the home_region in .caribou/config.yml of all SeBS workflows.
+Only the home_region block is changed, allowed_regions stays unchanged.
 
-Aufruf (im Ordner caribou_sebs):
+Usage (in the folder caribou_sebs):
     poetry run python set_home_region.py eu-central-1
     poetry run python set_home_region.py eu-central-1 --only sebs_graph_bfs
 """
@@ -17,7 +17,7 @@ def set_home_region(config: Path, region: str) -> str | None:
         if not re.match(r"\s*home_region\s*:", line):
             continue
         indent = len(line) - len(line.lstrip())
-        # Block unter home_region durchsuchen, bis die Einrueckung wieder zurueckgeht
+        # search the block below home_region until the indentation decreases again
         for j in range(i + 1, len(lines)):
             sub = lines[j]
             if sub.strip() and len(sub) - len(sub.lstrip()) <= indent:
@@ -34,8 +34,8 @@ def set_home_region(config: Path, region: str) -> str | None:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("region", help="neue Home-Region, z. B. eu-central-1")
-    ap.add_argument("--only", nargs="*", help="nur diese Workflow-Ordner")
+    ap.add_argument("region", help="new home region, e.g. eu-central-1")
+    ap.add_argument("--only", nargs="*", help="only these workflow folders")
     args = ap.parse_args()
 
     folders = sorted(p for p in Path(".").iterdir() if p.is_dir() and p.name.startswith("sebs_"))
@@ -44,10 +44,10 @@ def main() -> None:
     for wf in folders:
         cfg = wf / ".caribou" / "config.yml"
         if not cfg.exists():
-            print(f"{wf.name:30s} config.yml fehlt")
+            print(f"{wf.name:30s} config.yml missing")
             continue
         old = set_home_region(cfg, args.region)
-        print(f"{wf.name:30s} " + (f"{old} -> {args.region}" if old else "home_region NICHT gefunden"))
+        print(f"{wf.name:30s} " + (f"{old} -> {args.region}" if old else "home_region NOT found"))
 
 
 if __name__ == "__main__":

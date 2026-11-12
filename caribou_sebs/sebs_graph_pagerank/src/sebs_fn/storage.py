@@ -1,7 +1,7 @@
-# AWS-Speicheranbindung aus SeBS (benchmarks/wrappers/aws/python/storage.py).
-# Einzige Aenderung: Der S3-Client wird explizit in der Region des Eingabe-Buckets
-# erzeugt (Umgebungsvariable SEBS_BUCKET_REGION), damit die Funktion auch dann
-# korrekt auf den Bucket zugreift, wenn Caribou sie in eine andere Region verschiebt.
+# AWS storage wrapper from SeBS (benchmarks/wrappers/aws/python/storage.py).
+# Only change: the S3 client is created explicitly in the region of the input bucket
+# (environment variable SEBS_BUCKET_REGION), so that the function still accesses the
+# bucket correctly when Caribou moves it to another region.
 import io
 import os
 import uuid

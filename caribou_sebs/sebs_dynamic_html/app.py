@@ -1,8 +1,8 @@
 """
-Caribou-Workflow fuer den SeBS-Benchmark 110.dynamic-html (in EcoLife: "dynamic-100k").
+Caribou workflow for the SeBS benchmark 110.dynamic-html (in EcoLife: "dynamic-100k").
 
-Die eigentliche Rechenlogik ist unveraendert aus SeBS uebernommen
-(src/sebs_fn/function.py). Diese Datei ergaenzt nur das Caribou-Geruest.
+The computation itself is taken unchanged from SeBS (src/sebs_fn/function.py).
+This file only adds the Caribou scaffolding.
 """
 import json
 import time
@@ -21,15 +21,15 @@ def dynamic_html(event: Any) -> dict[str, Any]:
     if isinstance(event, str):
         event = json.loads(event)
 
-    # Erst hier importieren: so braucht der lokale Rechner beim Deploy die
-    # Abhaengigkeiten der Funktion (z. B. torch, igraph) nicht installiert.
+    # Import here so that the local machine does not need the function's
+    # dependencies (e.g. torch, igraph) installed when deploying.
     from src.sebs_fn.function import handler as sebs_handler
 
     start = time.time()
     output = sebs_handler(event)
     duration_s = time.time() - start
 
-    # Nur Messwerte zurueckgeben, nicht das (teils sehr grosse) Rechenergebnis.
+    # Return only measurements, not the (sometimes very large) computation result.
     result = {"status": 200, "benchmark": "dynamic-100k", "sebs_duration_s": duration_s}
     if isinstance(output, dict) and "measurement" in output:
         result["measurement"] = output["measurement"]
