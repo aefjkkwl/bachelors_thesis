@@ -4,7 +4,7 @@ This folder contains only the changes made to Caribou for the thesis, not Caribo
 (thesis, Section 4.2).
 
 - Upstream repository: https://github.com/ubc-cirrus-lab/caribou
-- Base version: `main` branch, downloaded on 3 September 2026
+- Base version: commit `fea32e7` (main branch as of 3 September 2026)
 
 ## Apply the changes
 
@@ -42,5 +42,3 @@ None of the changes alters Caribou's decision logic.
 
 The SeBS functions wrapped as Caribou workflows are in `caribou_sebs/`, the replay of the
 evaluation week in `evaluation/replay_caribou_week.py`.
-
-Replace `<YOUR_INPUT_BUCKET>` in `payloads_final/` with the name of your own S3 bucket in us-east-1 that holds the SeBS input files (uploaded with `upload_inputs.py`).

@@ -14,11 +14,17 @@ From the root of a fresh EcoLife checkout:
     git apply --check <REPO>/ecolife/ecolife_changes.patch
     git apply <REPO>/ecolife/ecolife_changes.patch
 
+Install the packages needed for the simulation and unpack the traces. EcoLife's trace file
+names contain `*`, which Windows does not allow, so the simulation requires Linux, macOS or WSL:
+
+    pip install fire numpy pandas matplotlib
+    unzip selected_trace.zip
+
 Then copy the two carbon intensity files used in the thesis into EcoLife's
 `carbon_intensity/` folder under the names EcoLife expects:
 
-    copy <REPO>\data\carbon\snapshots_2026-02-10_DE-2025-hourly.csv          carbon_intensity\DE_2025_hourly.csv
-    copy <REPO>\data\carbon\snapshots_2026-02-10_US-MIDA-PJM-2025-hourly.csv carbon_intensity\US-MIDA-PJM_2025_hourly.csv
+    cp <REPO>/data/carbon/snapshots_2026-02-10_DE-2025-hourly.csv          carbon_intensity/DE_2025_hourly.csv
+    cp <REPO>/data/carbon/snapshots_2026-02-10_US-MIDA-PJM-2025-hourly.csv carbon_intensity/US-MIDA-PJM_2025_hourly.csv
 
 ## What the patch changes
 
