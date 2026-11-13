@@ -1,0 +1,11 @@
+﻿Function,US median [s],EU median [s],Additional time in EU [s]
+compression,2.539,11.102,8.7052
+dna,8.1145,9.508,1.8481
+video,1.389,2.336,1.0248
+upload-img,0.085,0.643,0.5628
+pagerank,12.3765,12.045,0.3618
+thumbnailer,0.0985,0.447,0.354
+image-recog,0.335,0.4955,0.1793
+mst,7.118,6.827,0.1077
+dynamic,0.116,0.146,0.0365
+bfs,7.5555,6.797,-0.3352

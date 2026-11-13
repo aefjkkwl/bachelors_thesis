@@ -1,0 +1,5 @@
+﻿From,To,Mean [ms],Median [ms],p95 [ms]
+eu-central-1,eu-central-1,1.68,1.64,2.25
+eu-central-1,us-east-1,90.19,90.1,91.88
+us-east-1,eu-central-1,92.89,92.86,93.68
+us-east-1,us-east-1,1.63,1.64,2.25
